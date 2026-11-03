@@ -1,8 +1,10 @@
 // ==UserScript==
 // @name         SunCHECK HDR Daily
 // @namespace    https://github.com/mobility22/SunCHECK-HDR-Daily
-// @version      1.3
+// @version      1.4
 // @description  Fill SunCHECK HDR Bravos daily QC (Save only, never Approve)
+// @match        http://cnrrtrocperfx.rrt.ca.kp.org/*
+// @match        https://cnrrtrocperfx.rrt.ca.kp.org/*
 // @match        http://cnrrtrocperfx.rrt.kca.kp.org/*
 // @match        https://cnrrtrocperfx.rrt.kca.kp.org/*
 // @updateURL    https://raw.githubusercontent.com/mobility22/SunCHECK-HDR-Daily/main/suncheck-hdr-daily.user.js
