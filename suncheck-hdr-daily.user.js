@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SunCHECK HDR Daily
 // @namespace    https://github.com/mobility22/SunCHECK-HDR-Daily
-// @version      1.17
+// @version      1.18
 // @description  Fill SunCHECK HDR Bravos daily QC (Save only, never Approve)
 // @match        http://cnrrtrocperfx.rrt.ca.kp.org/*
 // @match        https://cnrrtrocperfx.rrt.ca.kp.org/*
@@ -284,16 +284,40 @@
     log('done (Approve NOT clicked)');
   }
 
+  async function clearAll() {
+    if (!isExec()) { log('not an Execution page'); return; }
+    if (!confirm('SunCHECK: clear all filled fields on this page?')) return;
+    for (const name of ['Safety Checks', 'Timer Accuracy', 'Decay', 'Source Position', 'Survey Meter', 'Exposure Measurement']) {
+      const s = section(name);
+      if (!s) { log('clear: section not found:', name); continue; }
+      for (const x of textInputs(s)) if (x.value !== '') { setVal(x, ''); await sleep(80); }
+      for (const r of s.querySelectorAll('input[type="radio"],input[type="checkbox"]')) if (r.checked) { r.checked = false; r.dispatchEvent(new Event('input', { bubbles: true })); r.dispatchEvent(new Event('change', { bubbles: true })); }
+      log('cleared', name);
+    }
+    log('clear done (not saved)');
+  }
+
+  function addClearButton(fill) {
+    if (document.getElementById('suncheck-clear-btn')) return;
+    const c = document.createElement('button');
+    c.id = 'suncheck-clear-btn'; c.textContent = 'Clear All'; c.title = 'SunCHECK: clear all filled fields';
+    c.style.cssText = 'position:fixed;bottom:12px;z-index:99999;padding:14px 22px;font-size:20px;font-weight:bold;background:#1565c0;color:#fff;border:2px solid #fff;border-radius:8px;box-shadow:0 3px 10px rgba(0,0,0,.4);cursor:pointer';
+    c.style.left = (12 + fill.offsetWidth + 12) + 'px';
+    c.onclick = () => clearAll();
+    document.body.appendChild(c);
+  }
+
   function addButton() {
     if (document.getElementById('suncheck-hdr-btn')) return;
     const b = document.createElement('button');
-    b.id = 'suncheck-hdr-btn'; const ver = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '1.17';
+    b.id = 'suncheck-hdr-btn'; const ver = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '1.18';
     b.innerHTML = 'HDR Daily Fill  v' + ver + '<div style="font-size:12px;font-weight:normal;margin-top:2px">' + today() + '</div><div class="sc-str" style="font-size:12px;font-weight:normal">Source strength: loading…</div>';
     fetchDaily().then(data => { const d = pickDay(data, today()); const v = d && (d.sourceTrends ?? d.sourceStrength ?? d.strength); const el = b.querySelector('.sc-str'); if (el) el.textContent = 'Source strength: ' + (v != null ? v + ' Ci' : 'MISSING for today'); if (v == null) b.style.background = '#c62828'; }); b.title = 'SunCHECK HDR Daily v' + ver;
     b.style.cssText = 'position:fixed;bottom:12px;left:12px;z-index:99999;padding:14px 28px;font-size:20px;font-weight:bold;background:#2e7d32;color:#fff;border:2px solid #fff;border-radius:8px;box-shadow:0 3px 10px rgba(0,0,0,.4);cursor:pointer';
     b.onclick = () => run();
     document.body.appendChild(b);
+    addClearButton(b);
   }
   document.addEventListener('keydown', e => { if (e.ctrlKey && e.shiftKey && e.key.toUpperCase() === 'H') { e.preventDefault(); run(); } });
-  setInterval(() => { const b = document.getElementById('suncheck-hdr-btn'); if (isExec()) addButton(); else if (b) b.remove(); }, 1000);
+  setInterval(() => { const b = document.getElementById('suncheck-hdr-btn'); if (isExec()) addButton(); else { if (b) b.remove(); const c = document.getElementById('suncheck-clear-btn'); if (c) c.remove(); } }, 1000);
 })();
