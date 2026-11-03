@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SunCHECK HDR Daily
 // @namespace    https://github.com/mobility22/SunCHECK-HDR-Daily
-// @version      1.0
+// @version      1.1
 // @description  Fill SunCHECK HDR Bravos daily QC (Save only, never Approve)
 // @match        http://crvrtrocperfs.nt.ca.kp.org/*
 // @updateURL    https://raw.githubusercontent.com/mobility22/SunCHECK-HDR-Daily/main/suncheck-hdr-daily.user.js
@@ -228,7 +228,7 @@
       });
     });
   }
-  // daily-data.json: [{"date":"2026-09-30","strength":10.165,"fake":[89.98,119.98,149.97],"real":[90.00,120.00,149.99]}, ...]
+  // daily-data.json: [{"date":"2026-09-30","sourceStrength":10.165,"fake90":89.98,"fake120":119.98,"fake150":149.97,"real90":90.00,"real120":120.00,"real150":149.99}, ...]
   function pickDay(data, date) {
     if (!data) return null;
     const arr = Array.isArray(data) ? data : (data.days || Object.entries(data).map(([k, v]) => ({ date: k, ...v })));
@@ -251,9 +251,11 @@
     await sleep(400);
 
     const day = pickDay(await fetchDaily(), d);
-    if (day && day.fake && day.real) {
-      log('source strength', day.strength);
-      await fillInputs('Source Position', [...day.fake, ...day.real].map(v => Number(v).toFixed(2)));
+    const pos = day ? (day.fake && day.real ? [...day.fake, ...day.real]
+      : [day.fake90, day.fake120, day.fake150, day.real90, day.real120, day.real150]) : null;
+    if (pos && pos.every(v => v != null)) {
+      log('source strength', day.sourceStrength ?? day.strength);
+      await fillInputs('Source Position', pos.map(v => Number(v).toFixed(2)));
     } else log('no source position data for', d, '- skipped');
     await sleep(400);
 
