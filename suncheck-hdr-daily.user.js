@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SunCHECK HDR Daily
 // @namespace    https://github.com/mobility22/SunCHECK-HDR-Daily
-// @version      1.11
+// @version      1.13
 // @description  Fill SunCHECK HDR Bravos daily QC (Save only, never Approve)
 // @match        http://cnrrtrocperfx.rrt.ca.kp.org/*
 // @match        https://cnrrtrocperfx.rrt.ca.kp.org/*
@@ -229,7 +229,7 @@
       });
     });
   }
-  // daily-data.json: [{"date":"2026-09-30","sourceStrength":10.165,"fake90":89.98,"fake120":119.98,"fake150":149.97,"real90":90.00,"real120":120.00,"real150":149.99}, ...]
+  // daily-data.json: [{"date":"2026-09-30","sourceStrength":10.165,"fake90":899.8,"fake120":1199.8,"fake150":1499.7,"real90":900.0,"real120":1200.0,"real150":1499.9 (mm)}, ...]
   function pickDay(data, date) {
     if (!data) return null;
     const arr = Array.isArray(data) ? data : (data.days || Object.entries(data).map(([k, v]) => ({ date: k, ...v })));
@@ -247,16 +247,18 @@
     await fillInputs('Timer Accuracy', [20]);
     await sleep(400);
 
-    if (DECAY[d] != null) await fillInputs('Decay', [DECAY[d].toFixed(3)]);
+    const day = pickDay(await fetchDaily(), d);
+    const ss = day ? (day.sourceStrength ?? day.strength ?? day.sourceTrends) : null;
+    if (ss != null) { log('decay/source strength from daily-data.json', ss); await fillInputs('Decay', [Number(ss).toFixed(3)]); }
+    else if (DECAY[d] != null) { log('no daily-data sourceStrength for', d, '- using decay table', DECAY[d]); await fillInputs('Decay', [DECAY[d].toFixed(3)]); }
     else log('no decay value for', d, '- skipped');
     await sleep(400);
 
-    const day = pickDay(await fetchDaily(), d);
     const pos = day ? (day.fake && day.real ? [...day.fake, ...day.real]
       : [day.fake90, day.fake120, day.fake150, day.real90, day.real120, day.real150]) : null;
     if (pos && pos.every(v => v != null)) {
       log('source strength', day.sourceStrength ?? day.strength);
-      await fillInputs('Source Position', pos.map(v => Number(v).toFixed(2)));
+      await fillInputs('Source Position', pos.map(v => Number(v).toFixed(1)));
     } else log('no source position data for', d, '- skipped');
     await sleep(400);
 
@@ -274,7 +276,7 @@
   function addButton() {
     if (document.getElementById('suncheck-hdr-btn')) return;
     const b = document.createElement('button');
-    b.id = 'suncheck-hdr-btn'; const ver = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '1.11';
+    b.id = 'suncheck-hdr-btn'; const ver = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '1.13';
     b.innerHTML = 'HDR Daily Fill  v' + ver + '<div style="font-size:12px;font-weight:normal;margin-top:2px">' + today() + '</div><div class="sc-str" style="font-size:12px;font-weight:normal">Source strength: loading…</div>';
     fetchDaily().then(data => { const d = pickDay(data, today()); const v = d && (d.sourceTrends ?? d.sourceStrength ?? d.strength); const el = b.querySelector('.sc-str'); if (el) el.textContent = 'Source strength: ' + (v != null ? v + ' Ci' : 'MISSING for today'); if (v == null) b.style.background = '#c62828'; }); b.title = 'SunCHECK HDR Daily v' + ver;
     b.style.cssText = 'position:fixed;bottom:12px;left:12px;z-index:99999;padding:14px 28px;font-size:20px;font-weight:bold;background:#2e7d32;color:#fff;border:2px solid #fff;border-radius:8px;box-shadow:0 3px 10px rgba(0,0,0,.4);cursor:pointer';
