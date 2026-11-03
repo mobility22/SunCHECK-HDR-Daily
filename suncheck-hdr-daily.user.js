@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         SunCHECK HDR Daily
 // @namespace    https://github.com/mobility22/SunCHECK-HDR-Daily
-// @version      1.9
+// @version      1.10
 // @description  Fill SunCHECK HDR Bravos daily QC (Save only, never Approve)
 // @match        http://cnrrtrocperfx.rrt.ca.kp.org/*
 // @match        https://cnrrtrocperfx.rrt.ca.kp.org/*
-// @updateURL    https://raw.githubusercontent.com/mobility22/SunCHECK-HDR-Daily/main/suncheck-hdr-daily.user.js
-// @downloadURL  https://raw.githubusercontent.com/mobility22/SunCHECK-HDR-Daily/main/suncheck-hdr-daily.user.js
+// @updateURL    https://raw.githubusercontent.com/mobility22/SunCHECK-HDR-Daily/refs/heads/main/suncheck-hdr-daily.user.js
+// @downloadURL  https://raw.githubusercontent.com/mobility22/SunCHECK-HDR-Daily/refs/heads/main/suncheck-hdr-daily.user.js
 // @grant        GM_xmlhttpRequest
 // @connect      raw.githubusercontent.com
 // @run-at       document-idle
@@ -274,7 +274,7 @@
   function addButton() {
     if (document.getElementById('suncheck-hdr-btn')) return;
     const b = document.createElement('button');
-    b.id = 'suncheck-hdr-btn'; const ver = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '1.9';
+    b.id = 'suncheck-hdr-btn'; const ver = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '1.10';
     b.innerHTML = 'HDR Daily Fill  v' + ver + '<div style="font-size:12px;font-weight:normal;margin-top:2px">' + today() + '</div><div class="sc-str" style="font-size:12px;font-weight:normal">Source strength: loading…</div>';
     fetchDaily().then(data => { const d = pickDay(data, today()); const v = d && (d.sourceTrends ?? d.sourceStrength ?? d.strength); const el = b.querySelector('.sc-str'); if (el) el.textContent = 'Source strength: ' + (v != null ? v + ' Ci' : 'MISSING for today'); }); b.title = 'SunCHECK HDR Daily v' + ver;
     b.style.cssText = 'position:fixed;bottom:12px;left:12px;z-index:99999;padding:14px 28px;font-size:20px;font-weight:bold;background:#2e7d32;color:#fff;border:2px solid #fff;border-radius:8px;box-shadow:0 3px 10px rgba(0,0,0,.4);cursor:pointer';
