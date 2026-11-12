@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         SunCHECK HDR Daily
 // @namespace    https://github.com/mobility22/SunCHECK-HDR-Daily
-// @version      1.23
+// @version      1.24
 // @description  Fill SunCHECK HDR Bravos daily QC (Save only, never Approve)
 // @match        http://cnrrtrocperfx.rrt.ca.kp.org/*
 // @match        https://cnrrtrocperfx.rrt.ca.kp.org/*
@@ -15,6 +15,7 @@
 (function () {
   'use strict';
   const TAG = '[SunCHECK]';
+  const SCRIPT_VERSION = '1.24';
   const log = (...a) => console.log(TAG, ...a);
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const DATA_URL = 'https://raw.githubusercontent.com/mobility22/SunCHECK-HDR-Daily/main/daily-data.json';
@@ -237,6 +238,7 @@
   }
 
   async function run() {
+    if (!pageHasBravos()) { log('not a Bravos page'); return; }
     if (!isExec()) { log('not an Execution page'); return; }
     const d = today();
     log('start', d);
@@ -280,6 +282,7 @@
 
   async function clearAll() {
     log('Clear All clicked');
+    if (!pageHasBravos()) { log('not a Bravos page'); return; }
     if (!isExec()) { log('not an Execution page'); return; }
     for (const name of ['Safety Checks', 'Timer Accuracy', 'Decay', 'Source Position', 'Survey Meter', 'Exposure Measurement']) {
       const s = section(name);
@@ -309,7 +312,7 @@
   function addButton() {
     if (document.getElementById('suncheck-hdr-btn')) return;
     const b = document.createElement('button');
-    b.id = 'suncheck-hdr-btn'; const ver = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || '1.23';
+    b.id = 'suncheck-hdr-btn'; const ver = (typeof GM_info !== 'undefined' && GM_info.script && GM_info.script.version) || SCRIPT_VERSION;
     b.innerHTML = 'HDR Daily Fill  v' + ver + '<div style="font-size:12px;font-weight:normal;margin-top:2px">' + today() + '</div><div class="sc-str" style="font-size:12px;font-weight:normal">Source strength: loading…</div>';
     fetchDaily().then(data => { const d = pickDay(data, today()); const v = d && (d.sourceTrends ?? d.sourceStrength ?? d.strength); const el = b.querySelector('.sc-str'); if (el) el.textContent = 'Source strength: ' + (v != null ? v + ' Ci' : 'MISSING for today'); if (v == null) b.style.background = '#c62828'; }); b.title = 'SunCHECK HDR Daily v' + ver;
     b.style.cssText = 'position:fixed;bottom:12px;left:12px;z-index:99999;padding:14px 28px;font-size:20px;font-weight:bold;background:#2e7d32;color:#fff;border:2px solid #fff;border-radius:8px;box-shadow:0 3px 10px rgba(0,0,0,.4);cursor:pointer';
@@ -317,6 +320,85 @@
     document.body.appendChild(b);
     addClearButton(b);
   }
-  document.addEventListener('keydown', e => { if (e.ctrlKey && e.shiftKey && e.key.toUpperCase() === 'H') { e.preventDefault(); run(); } });
-  setInterval(() => { const b = document.getElementById('suncheck-hdr-btn'); if (isExec()) addButton(); else { if (b) b.remove(); const c = document.getElementById('suncheck-clear-btn'); if (c) c.remove(); } }, 1000);
+  const BRAVOS_RE = /bravos/i;
+  const GATE_TIMEOUT_MS = 30000;
+  const HEADER_SEL = 'header,[role="banner"],[class*="title" i],[class*="header" i],[class*="toolbar" i],[class*="navbar" i],[class*="appbar" i],[class*="app-bar" i],[class*="topbar" i],[class*="top-bar" i],h1,h2';
+
+  function headerHasBravos() {
+    try {
+      const nodes = document.querySelectorAll(HEADER_SEL);
+      for (const el of nodes) {
+        if (BRAVOS_RE.test(el.innerText || el.textContent || '')) return true;
+      }
+    } catch (e) { /* selector not supported; fall through to body text */ }
+    return false;
+  }
+  function pageHasBravos() {
+    if (headerHasBravos()) return true;
+    const t = (document.body && (document.body.innerText || document.body.textContent)) || '';
+    return BRAVOS_RE.test(t);
+  }
+
+  function removeButtons() {
+    const b = document.getElementById('suncheck-hdr-btn'); if (b) b.remove();
+    const c = document.getElementById('suncheck-clear-btn'); if (c) c.remove();
+  }
+  function syncButtons() {
+    if (!automationEnabled || !pageHasBravos()) { disableAutomation(); return; }
+    if (isExec()) addButton();
+    else removeButtons();
+  }
+
+  let automationEnabled = false;
+  let buttonTickId = null;
+  let gateDebounce = null;
+  let timeoutLogged = false;
+
+  function enableAutomation() {
+    if (automationEnabled) return;
+    automationEnabled = true;
+    log('Bravos detected — starting');
+    buttonTickId = setInterval(syncButtons, 1000);
+    syncButtons();
+  }
+  function disableAutomation() {
+    if (!automationEnabled) { removeButtons(); return; }
+    automationEnabled = false;
+    if (buttonTickId) { clearInterval(buttonTickId); buttonTickId = null; }
+    removeButtons();
+    log('Bravos not on page — stopped');
+  }
+  function evaluateGate() {
+    if (pageHasBravos()) enableAutomation();
+    else disableAutomation();
+  }
+  function onPossibleChange() {
+    if (gateDebounce) clearTimeout(gateDebounce);
+    gateDebounce = setTimeout(evaluateGate, 200);
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey && e.shiftKey && e.key.toUpperCase() === 'H') {
+      e.preventDefault();
+      if (!pageHasBravos()) { log('not a Bravos page'); return; }
+      run();
+    }
+  });
+
+  log('waiting for Bravos on page');
+  evaluateGate();
+  const root = document.documentElement || document.body;
+  if (root && typeof MutationObserver === 'function') {
+    const observer = new MutationObserver(onPossibleChange);
+    observer.observe(root, { childList: true, subtree: true, characterData: true });
+  }
+  window.addEventListener('hashchange', onPossibleChange);
+  window.addEventListener('popstate', onPossibleChange);
+  setInterval(evaluateGate, 2000);
+  setTimeout(() => {
+    if (!automationEnabled && !timeoutLogged) {
+      timeoutLogged = true;
+      log('Bravos not found after', GATE_TIMEOUT_MS / 1000, 's — idle until it appears');
+    }
+  }, GATE_TIMEOUT_MS);
 })();
